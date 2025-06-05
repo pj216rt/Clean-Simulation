@@ -29,6 +29,11 @@ beta.gen.fun.tri <- function(grid.size, knots, parameters, deg){
   return(coefs)
 }
 
+#function to plot and save simulated cofficient plots
+generated.coef.plot <- function(generated.beta.values){
+  
+}
+
 #generate 3 dimensional data, assuming a balanced simulation design
 gen.3d.data <- function(num.subj = 50, num.visits = 5,
                         beta.vals, var.x = 1, var.z=1){
@@ -52,26 +57,37 @@ gen.3d.data <- function(num.subj = 50, num.visits = 5,
   tot.obs <- num.subj*num.visits
   
   #generate the X design matrix
+  #each subject receives their own set of covariates
   X <- matrix(rnorm(n=(num.subj*n.params), sd = sqrt(var.x)), 
               nrow = num.subj, ncol = n.params) %>%
     as.data.frame() %>%
     mutate(subj = row_number())
   
   X$subj = as.factor(X$subj)
+  
+  #X1 replicates each subject's covariates num.visits times to put it in long format
   X1 <- X[rep(seq_len(nrow(X)), each = num.visits), ]
+  
+  #create design matrix dropping intercept and the column subj
   X.des <- model.matrix(~. -1 -subj, data = X1)
   
-  #generate fixed effects
+  #generate fixed effects by multiplying design matrix by beta values
   fixef = as.matrix(X.des) %*% as.matrix(beta.vals)
   
   #random effects
+  
+  #create random effect design matrix using subject IDs
   Z.des = model.matrix( ~ 0 + subj + (-1):subj, data = X1)
+  
+  #creates a matrix where each row is a subject, and each column corresponds to
+  #a point on the grid.  Basically each row is a set of different random deviations
+  #over the grid
   subj.ranef <- matrix(rnorm(n=(num.subj*grid.size.3d), sd=sqrt(var.z)), 
                        nrow = num.subj, ncol = grid.size.3d)
   ranef <- Z.des %*% subj.ranef
   
-  #level 1 residuals
-  eps <- rnorm(n = tot.obs)
+  #level 1 residuals, adding Gaussian noise for each observation
+  eps <- matrix(rnorm(n = tot.obs * grid.size.3d), nrow = tot.obs, ncol = grid.size.3d)
   
   #add random effects and epsilon errors to the observed data
   #Yij.true = a true latent trajectory??
@@ -90,3 +106,4 @@ gen.3d.data <- function(num.subj = 50, num.visits = 5,
   return(output.list)
   
 }
+
