@@ -31,8 +31,53 @@ beta.gen.fun.tri <- function(grid.size, knots, parameters, deg){
 
 #function to plot and save simulated cofficient plots
 generated.coef.plot <- function(generated.beta.values){
+  ##function accepta generate beta values
   
+  #get the number of grid time points in each of the 3 dimensions, prepare for 
+  #plotting them by getting dimension labels ready
+  cols_per_dim <- ncol(generated.beta.values) /3
+  dim_labels <- c("X", "Y", "Z")
+  
+  df <- as.data.frame(generated.beta.values) %>%
+    mutate(param = row_number()) %>%
+    pivot_longer(
+      cols = -param,
+      names_to = "colname",
+      values_to = "value"
+    ) %>%
+    mutate(
+      col_index = as.integer(gsub("V", "", colname)),
+      dim = dim_labels[ceiling(col_index / cols_per_dim)],
+      time = (col_index - 1) %% cols_per_dim + 1
+    )
+  
+  coef.plot <- ggplot(df, aes(x = time, y = value, group = param, color = factor(param))) +
+    geom_line(alpha = 0.8, linewidth = 0.8) +
+    facet_wrap(~dim, nrow = 1, strip.position = "top") +
+    labs(
+      x = "Time",
+      y = "Coefficient Value",
+      title = "Functional Regression Coefficient Trajectories",
+      subtitle = "Colored by Parameter",
+      color = "Parameter"
+    ) +
+    ##the theme minimal base sets all fonbt size to 14pts
+    ##the strip text controls the facet labels
+    ##element_text for the plot_title centers and makes bold the title
+    ##also centers the subtitle, but does not bold it
+    ##also tweaks the spacing between the facets
+    theme_minimal(base_size = 14) +
+    theme(
+      strip.text = element_text(face = "bold", size = 13),
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5),
+      panel.spacing = unit(1, "lines")
+    ) +
+    scale_color_viridis_d(option = "D")
+  
+  return(coef.plot)
 }
+
 
 #generate 3 dimensional data, assuming a balanced simulation design
 gen.3d.data <- function(num.subj = 50, num.visits = 5,
