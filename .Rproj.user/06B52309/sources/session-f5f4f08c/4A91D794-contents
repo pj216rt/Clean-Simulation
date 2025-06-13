@@ -769,3 +769,47 @@ goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
 
 
 #plot the posterior output of the Gibbs samplers
+clean.gibbs.output.univariate <- function(posterior.ouptut){
+  #posterior mean
+  post.means <- posterior.ouptut$beta.pm %>% as.data.frame() %>%
+    mutate(parameters = row_number()) %>% 
+    pivot_longer(!parameters, names_to = "time", values_to = "value")
+  post.means$time <- gsub('V', '', post.means$time)
+  post.means$time <- as.numeric(post.means$time)
+  
+  #posterior lower bound
+  post.lower <- posterior.ouptut$beta.LB %>% as.data.frame() %>%
+    mutate(parameters = row_number()) %>% 
+    pivot_longer(!parameters, names_to = "time", values_to = "LB")
+  post.lower$time <- gsub('V', '', post.lower$time)
+  post.lower$time <- as.numeric(post.lower$time)
+  
+  #posterior upper bound
+  post.upper <- posterior.ouptut$beta.UB %>% as.data.frame() %>%
+    mutate(parameters = row_number()) %>% 
+    pivot_longer(!parameters, names_to = "time", values_to = "UB")
+  post.upper$time <- gsub('V', '', post.upper$time)
+  post.upper$time <- as.numeric(post.upper$time)
+  
+  output <- post.means
+  output$LB <- post.lower$LB
+  output$UB <- post.upper$UB
+  
+  return(output)
+}
+
+plot.univariate.gibbs <- function(cleaned.posterior){
+  plot1 <- ggplot(cleaned.posterior, aes(x = time, y = value, group = parameters)) +
+    geom_ribbon(aes(ymin = LB, ymax = UB), fill = "grey80", alpha = 0.5) +
+    geom_line(aes(color = factor(parameters))) +
+    labs(x = "Time", y = "Value", color = "Parameter", 
+         title = "Posterior Mean of Functional Regression Coefficients with 95% Credible Intervals") +
+    theme_minimal() 
+  
+  return(plot1)
+}
+
+
+plot1 <- clean.gibbs.output.univariate(posterior.ouptut = test2)
+plot2 <- plot.univariate.gibbs(cleaned.posterior = plot1)
+plot2
