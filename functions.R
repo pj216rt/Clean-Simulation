@@ -483,10 +483,10 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   
   #return things
   ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
-             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz)
+             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw)
   names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
                  "Sigma_samples", "sigma_Z_samples", "sigma_W_samples", "Penalty_Matrix", "inv.wish.df",
-                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b")
+                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b")
   
   ret
 }
@@ -497,7 +497,8 @@ test2 <- goldsmiths.one.d.gibbs(Y = test1$obs, fixed_design.mat = test1$x_design
 
 #function compute log prior of the functional model
 univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scale, sigm2.samps, 
-                                 sigmaZ.hyper1, sigmaZ.hyper2){
+                                 sigmaZ.hyper1, sigmaZ.hyper2, sigmaw2.samps, sigmaW.hypers1, 
+                                 sigmaW.hypers2){
   S <- dim(Sigma.samples)[3]
   
   #init log prior values
@@ -506,9 +507,15 @@ univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scal
   #extract the sth sample
   for (s in 1:S) {
     
+    #sigma_w^2 portion
+    lambda_bw_s <- sigmaw2.samps[s,]
+    lp_sigma_w2 <- sum(log(mapply(MCMCpack::dinvgamma, lambda_bw_s, 
+                                  shape = sigmaW.hypers1, scale = sigmaW.hypers2)))
+    print(lp_sigma_w2)
+    
     #sigma_z^2 portion
     lambda_bz_s <- sigm2.samps[s]
-    lp_sigma_z2 <- MCMCpack::dinvgamma(lambda_bz_s, shape = sigmaZ.hyper1, scale = sigmaZ.hyper2)
+    lp_sigma_z2 <- log(MCMCpack::dinvgamma(lambda_bz_s, shape = sigmaZ.hyper1, scale = sigmaZ.hyper2))
     
     #the Sigma portion
     Sigma_s  <- Sigma.samples[,,s]
@@ -516,7 +523,7 @@ univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scal
     
     
     #add everything together
-    log_priors[s] <- lp_sigma_z2 + lp_Sigma
+    log_priors[s] <- lp_sigma_w2 + lp_sigma_z2 + lp_Sigma
   }
 
   return(log_priors)
@@ -525,7 +532,8 @@ univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scal
 test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.df = test2$inv.wish.df,
                               Sigma.prior.scale = test2$inv.wish.scale, sigm2.samps = test2$sigma_Z_samples, 
                               sigmaZ.hyper1 = test2$SigmaZ.a, 
-                              sigmaZ.hyper2 = test2$SigmaZ.b)
+                              sigmaZ.hyper2 = test2$SigmaZ.b, sigmaw2.samps = test2$sigma_W_samples,
+                              sigmaW.hypers1 = test2$SigmaW.a, sigmaW.hypers2 = test2$SigmaW.b)
 
 
 plot(test3)
