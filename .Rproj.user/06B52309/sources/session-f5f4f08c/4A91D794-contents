@@ -454,27 +454,29 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   ranef.pm = Z.des %*% b.pm
   Yhat = apply(y.post, c(1,2), mean)
   
-  #MCMC diagnostics
-  #b_w matrix
-  b.w.mcmc <- data.frame(matrix(BW, nrow=dim(BW)[3], byrow=TRUE))
-  b.w.mcmc <- mcmc(tail(b.w.mcmc, n = (N.iter - N.burn)))
-  print(effectiveSize(b.w.mcmc)[which.min(effectiveSize(b.w.mcmc))])
+  #extracing posterior samples
+  #the fixed and random effect spline coefficients
+  BW.samples = BW[,, (N.burn + 1):N.iter]
+  BZ.samples = BZ[,, (N.burn + 1):N.iter]
   
-  #b_z matrix
-  b.z.mcmc <- data.frame(matrix(BZ, nrow=dim(BZ)[3], byrow=TRUE))
-  b.z.mcmc <- mcmc(tail(b.z.mcmc, n = (N.iter - N.burn)))
-  print(effectiveSize(b.z.mcmc)[which.min(effectiveSize(b.z.mcmc))])
+  #the lambda samples
+  lambda_bw_samples <- LAMBDA.BW[(N.burn+1):N.iter, ] #(N.iter-N.burn)*p
+  lambda_bz_samples <- LAMBDA.BZ[(N.burn+1):N.iter]  #(N.iter-N.burn)
+  inv_sig_samples   <- INV.SIG[,, (N.burn+1):N.iter]  #D*D*(N.iter-N.burn)
   
-  #lambda bz terms
-  lambda.bzs <- mcmc(tail(cbind(LAMBDA.BZ), n = (N.iter - N.burn)))
-  print(effectiveSize(lambda.bzs))
+  #convert precisions, to variances
+  sigma2_w_samples <- 1 / lambda_bw_samples #dim should be (800*p)
+  sigma2_z_samples <- 1 / lambda_bz_samples
   
-  #lambda bw terms
-  lambda.bws <- mcmc(tail(cbind(LAMBDA.BW), n = (N.iter - N.burn)))
-  print(effectiveSize(lambda.bws))
+  #convert precision matrix to covariance matrix
+  Sigma_samples <- apply(inv_sig_samples, 3, solve)
   
-  ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat)
-  names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat")
+  
+  #return things
+  ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
+             sigma2_z_samples, sigma2_w_samples)
+  names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
+                 "Sigma_samples", "sigma_Z_samples", "sigma_W_samples")
   
   ret
 }
@@ -482,6 +484,11 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
 
 test2 <- goldsmiths.one.d.gibbs(Y = test1$obs, fixed_design.mat = test1$x_design,
                                 random_design.mat = test1$z_design, Kt=5)
+
+#function compute log prior of the functional model
+univariate.log.prior <- function(){
+  
+}
 
 #Goldsmith's modified Gibbs sampler for 3 dimensions
 goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat, 
@@ -769,6 +776,7 @@ goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
 
 
 #plot the posterior output of the Gibbs samplers
+#getting the posterior mean and bounds
 clean.gibbs.output.univariate <- function(posterior.ouptut){
   #posterior mean
   post.means <- posterior.ouptut$beta.pm %>% as.data.frame() %>%
@@ -798,6 +806,7 @@ clean.gibbs.output.univariate <- function(posterior.ouptut){
   return(output)
 }
 
+#actually plotting the regression coefficients with CIs
 plot.univariate.gibbs <- function(cleaned.posterior){
   plot1 <- ggplot(cleaned.posterior, aes(x = time, y = value, group = parameters)) +
     geom_ribbon(aes(ymin = LB, ymax = UB), fill = "grey80", alpha = 0.5) +
