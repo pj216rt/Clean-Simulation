@@ -6,6 +6,7 @@ library(MASS)
 library(MCMCpack) #for the inverse wishart distribution
 require(gridExtra)
 library(bayesplot)
+library(abind)
 
 ##univariate functional portion
 beta.gen.fun.uni <- function(grid.size, knots, parameters, deg){
@@ -469,13 +470,23 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   sigma2_z_samples <- 1 / lambda_bz_samples
   
   #convert precision matrix to covariance matrix
-  Sigma_samples <- apply(inv_sig_samples, 3, solve)
-  
+  #Sigma_samples <- apply(inv_sig_samples, 3, solve)
+  #abind is a generalization of rbind and cbind.  Accepts a sequence of vectors, matrices,
+  #and arrays and returns an array of the same dimension
+  #Sigma_samples <- abind::abind(lapply((N.burn+1):N.iter, function(i) solve(inv_sig_samples[,,i])), along = 3)
+
+  S <- dim(inv_sig_samples)[3]
+  Sigma_samples <- abind::abind(
+    lapply(1:S, function(i) solve(inv_sig_samples[,,i])),
+    along = 3
+  )
   
   #return things
-  ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples)
+  ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
+             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz)
   names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
-                 "Sigma_samples")
+                 "Sigma_samples", "sigma_Z_samples", "sigma_W_samples", "Penalty_Matrix", "inv.wish.df",
+                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b")
   
   ret
 }
@@ -483,6 +494,41 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
 
 test2 <- goldsmiths.one.d.gibbs(Y = test1$obs, fixed_design.mat = test1$x_design,
                                 random_design.mat = test1$z_design, Kt=5)
+
+#function compute log prior of the functional model
+univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scale, sigm2.samps, 
+                                 sigmaZ.hyper1, sigmaZ.hyper2){
+  S <- dim(Sigma.samples)[3]
+  
+  #init log prior values
+  log_priors <- numeric(S)
+  
+  #extract the sth sample
+  for (s in 1:S) {
+    
+    #sigma_z^2 portion
+    lambda_bz_s <- sigm2.samps[s]
+    lp_sigma_z2 <- MCMCpack::dinvgamma(lambda_bz_s, shape = sigmaZ.hyper1, scale = sigmaZ.hyper2)
+    
+    #the Sigma portion
+    Sigma_s  <- Sigma.samples[,,s]
+    lp_Sigma <- log(MCMCpack::diwish(Sigma_s, v = Sigma.prior.df, S = Sigma.prior.scale))
+    
+    
+    #add everything together
+    log_priors[s] <- lp_sigma_z2 + lp_Sigma
+  }
+
+  return(log_priors)
+}
+
+test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.df = test2$inv.wish.df,
+                              Sigma.prior.scale = test2$inv.wish.scale, sigm2.samps = test2$sigma_Z_samples, 
+                              sigmaZ.hyper1 = test2$SigmaZ.a, 
+                              sigmaZ.hyper2 = test2$SigmaZ.b)
+
+
+plot(test3)
 
 #Goldsmith's modified Gibbs sampler for 3 dimensions
 goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat, 
