@@ -498,15 +498,19 @@ test2 <- goldsmiths.one.d.gibbs(Y = test1$obs, fixed_design.mat = test1$x_design
 #function compute log prior of the functional model
 univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scale, sigm2.samps, 
                                  sigmaZ.hyper1, sigmaZ.hyper2, sigmaw2.samps, sigmaW.hypers1, 
-                                 sigmaW.hypers2){
+                                 sigmaW.hypers2, comp.penalty.mat, BW_s){
+  #get parameters for everything
   S <- dim(Sigma.samples)[3]
+  Kt <- nrow(BW_s)
+  p <- ncol(BW_s)
+  print(dim(BW_s))
+  # I <- ncol(BZ)
   
   #init log prior values
   log_priors <- numeric(S)
   
   #extract the sth sample
   for (s in 1:S) {
-    
     #sigma_w^2 portion
     lambda_bw_s <- sigmaw2.samps[s,]
     lp_sigma_w2 <- sum(log(mapply(MCMCpack::dinvgamma, lambda_bw_s, 
@@ -520,9 +524,19 @@ univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scal
     Sigma_s  <- Sigma.samples[,,s]
     lp_Sigma <- log(MCMCpack::diwish(Sigma_s, v = Sigma.prior.df, S = Sigma.prior.scale))
     
+    #BW portion
+    lp_BW <- 0
+    for (k in 1:p) {
+      bw_k <- BW_s[,k,s]  
+      cov_k <- solve(lambda_bw_s[k] * comp.penalty.mat)
+      lp_BW <- lp_BW + dmvnorm(bw_k, mean = rep(0, Kt), sigma = cov_k, log = TRUE)
+    }
+    
+    #BZ portion
+    
     
     #add everything together
-    log_priors[s] <- lp_sigma_w2 + lp_sigma_z2 + lp_Sigma
+    log_priors[s] <- lp_sigma_w2 + lp_sigma_z2 + lp_Sigma + lp_BW
   }
 
   return(log_priors)
@@ -532,7 +546,8 @@ test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.d
                               Sigma.prior.scale = test2$inv.wish.scale, sigm2.samps = test2$sigma_Z_samples, 
                               sigmaZ.hyper1 = test2$SigmaZ.a, 
                               sigmaZ.hyper2 = test2$SigmaZ.b, sigmaw2.samps = test2$sigma_W_samples,
-                              sigmaW.hypers1 = test2$SigmaW.a, sigmaW.hypers2 = test2$SigmaW.b)
+                              sigmaW.hypers1 = test2$SigmaW.a, sigmaW.hypers2 = test2$SigmaW.b,
+                              comp.penalty.mat = test2$Penalty_Matrix, BW_s = test2$BW_samples)
 
 
 plot(test3)
