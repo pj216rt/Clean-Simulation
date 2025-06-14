@@ -483,10 +483,10 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   
   #return things
   ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
-             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw)
+             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw, Wi)
   names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
                  "Sigma_samples", "sigma_Z_samples", "sigma_W_samples", "Penalty_Matrix", "inv.wish.df",
-                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b")
+                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b", "fixed_effect_design")
   
   ret
 }
@@ -498,13 +498,13 @@ test2 <- goldsmiths.one.d.gibbs(Y = test1$obs, fixed_design.mat = test1$x_design
 #function compute log prior of the functional model
 univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scale, sigm2.samps, 
                                  sigmaZ.hyper1, sigmaZ.hyper2, sigmaw2.samps, sigmaW.hypers1, 
-                                 sigmaW.hypers2, comp.penalty.mat, BW_s){
+                                 sigmaW.hypers2, comp.penalty.mat, BW_s, BZ_s, Wi){
   #get parameters for everything
   S <- dim(Sigma.samples)[3]
   Kt <- nrow(BW_s)
   p <- ncol(BW_s)
-  print(dim(BW_s))
-  # I <- ncol(BZ)
+  I <- ncol(BZ_s)
+  print(dim(BZ_s))
   
   #init log prior values
   log_priors <- numeric(S)
@@ -528,29 +528,42 @@ univariate.log.prior <- function(Sigma.samples, Sigma.prior.df, Sigma.prior.scal
     lp_BW <- 0
     for (k in 1:p) {
       bw_k <- BW_s[,k,s]  
-      cov_k <- solve(lambda_bw_s[k] * comp.penalty.mat)
+      cov_k <- lambda_bw_s[k]*solve(comp.penalty.mat)
       lp_BW <- lp_BW + dmvnorm(bw_k, mean = rep(0, Kt), sigma = cov_k, log = TRUE)
     }
     
     #BZ portion
-    
+    lp_BZ <- 0
+    for (i in 1:I) {
+      mu_i <- BW_s[,,s] %*% t(Wi[i, ])  #mean vector of length Kt
+      cov_i <- lambda_bz_s * solve(comp.penalty.mat)
+      bz_i <- BZ_s[,i,s]
+      lp_BZ <- lp_BZ + dmvnorm(bz_i, mean = as.vector(mu_i), sigma = cov_i, log = TRUE)
+    }
     
     #add everything together
-    log_priors[s] <- lp_sigma_w2 + lp_sigma_z2 + lp_Sigma + lp_BW
+    log_priors[s] <- lp_sigma_w2 + lp_sigma_z2 + lp_Sigma + lp_BW + lp_BZ
   }
 
   return(log_priors)
 }
 
+#testin the log prior function
 test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.df = test2$inv.wish.df,
                               Sigma.prior.scale = test2$inv.wish.scale, sigm2.samps = test2$sigma_Z_samples, 
                               sigmaZ.hyper1 = test2$SigmaZ.a, 
                               sigmaZ.hyper2 = test2$SigmaZ.b, sigmaw2.samps = test2$sigma_W_samples,
                               sigmaW.hypers1 = test2$SigmaW.a, sigmaW.hypers2 = test2$SigmaW.b,
-                              comp.penalty.mat = test2$Penalty_Matrix, BW_s = test2$BW_samples)
+                              comp.penalty.mat = test2$Penalty_Matrix, BW_s = test2$BW_samples,
+                              BZ_s = test2$BZ_samples, Wi = test2$fixed_effect_design)
 
 
 plot(test3)
+
+#function for the log likelihood of the model
+univaraite.log.likelihood <- function(){
+  
+}
 
 #Goldsmith's modified Gibbs sampler for 3 dimensions
 goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat, 
