@@ -612,8 +612,24 @@ test4 <- univariate.log.likelihood(fixed.design.matrix = test2$fixed_effect_desi
 plot(test4)
 
 
+#simple helper function to get log posterior
+univariate.log.posterior <- function(log.prior, log.like){
+  #simply add the two together
+  log.post <- log.prior + log.like
+  
+  return(log.post)
+}
+
+test5 <- univariate.log.posterior(log.prior = test3, log.like = test4)
+
 #function to compute the THAMES estimator for this univariate model
-univariate.THAMES.estimate <- function(){
+univariate.THAMES.estimate <- function(BW_samples, BZ_samples, Sigma_samples, sigma_bz_samples,
+                                       sigma_bw_samples){
+  #the hardest part of this is needing to flatten and combine all of the sampeld
+  #parameters into a single vector
+  
+  #get the number of posterior samples
+  S <- dim(BW_samples)[3]
   
 }
 
