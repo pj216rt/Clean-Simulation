@@ -284,6 +284,9 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   W.des = as.spam(fixed_design.mat)
   Z.des = as.spam(random_design.mat)
   
+  #return Y as well
+  Y_return <- Y
+  
   I = dim(Z.des)[2]
   D = dim(Y)[2]
   Ji = as.numeric(apply(Z.des, 2, sum))
@@ -483,11 +486,12 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   
   #return things
   ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
-             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw, Wi, Z.des, Theta)
+             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw, W.des, Z.des, Theta,
+             Y, Wi)
   names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
                  "Sigma_samples", "sigma_Z_samples", "sigma_W_samples", "Penalty_Matrix", "inv.wish.df",
                  "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b", "fixed_effect_design",
-                 "random_effect_design", "Theta_matrix")
+                 "random_effect_design", "Theta_matrix", "Y_obs", "subject_level_design")
   
   ret
 }
@@ -556,39 +560,64 @@ test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.d
                               sigmaZ.hyper2 = test2$SigmaZ.b, sigmaw2.samps = test2$sigma_W_samples,
                               sigmaW.hypers1 = test2$SigmaW.a, sigmaW.hypers2 = test2$SigmaW.b,
                               comp.penalty.mat = test2$Penalty_Matrix, BW_s = test2$BW_samples,
-                              BZ_s = test2$BZ_samples, Wi = test2$fixed_effect_design)
+                              BZ_s = test2$BZ_samples, Wi = test2$subject_level_design)
 
 
 plot(test3)
 
 #function for the log likelihood of the model
 univariate.log.likelihood <- function(fixed.design.matrix, random.design.matrix, 
-                                      BW.samples, BZ.samples, Theta.matrix, Sigma.samples){
+                                      BW.samples, BZ.samples, Theta.matrix, Sigma.samples, Y_obs){
   #The likelihood should be multivariate normal per observation
   #the mean structures is the fixed and random components
   
   #get the number of samples we're looping over
   S <- dim(Sigma.samples)[3]
   
-  #initialize
+  #initialize log likelihood
   lp_vector <- numeric(S)
   
-  print(dim(BW.samples))
-  print(dim(BZ.samples))
-  print(dim(Sigma.samples))
+  #progress bar
+  pb <- txtProgressBar(min = 0, max = S, style = 3)
   
   for (s in 1:S) {
+    setTxtProgressBar(pb, s)
     BW_s <- BW.samples[,,s]  
     BZ_s <- BZ.samples[,,s]  
-    Sigma_s <- Sigma.samples[,,s] 
+    Sigma_s <- Sigma.samples[,,s]
+    
+    #construct the mean matrix
+    mu_mat <- fixed.design.matrix %*% t(BW_s) %*% t(Theta.matrix) + random.design.matrix %*% t(BZ_s) %*% t(Theta.matrix)
+    
+    #log likelihood computed for each row
+    lp_s <- 0
+    for (i in 1:nrow(Y_obs)) {
+      #add the log likelihoods.  Log=TRUE
+      lp_s <- lp_s + dmvnorm(Y_obs[i, ], mean = mu_mat[i, ], sigma = Sigma_s, log = TRUE)
+    }
+    
+    lp_vector[s] <- lp_s
   }
   
+  close(pb)
+  
+  return(lp_vector)
 }
 
 test4 <- univariate.log.likelihood(fixed.design.matrix = test2$fixed_effect_design, 
                                    random.design.matrix = test2$random_effect_design,
                                    BW.samples = test2$BW_samples, BZ.samples = test2$BZ_samples,
-                                   Theta.matrix = test2$Theta_matrix, Sigma.samples = test2$Sigma_samples)
+                                   Theta.matrix = test2$Theta_matrix, Sigma.samples = test2$Sigma_samples,
+                                   Y_obs = test2$Y_obs)
+plot(test4)
+
+
+#function to compute the THAMES estimator for this univariate model
+univariate.THAMES.estimate <- function(){
+  
+}
+
+
 
 #Goldsmith's modified Gibbs sampler for 3 dimensions
 goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat, 
