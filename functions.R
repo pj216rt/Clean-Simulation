@@ -561,7 +561,9 @@ test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.d
 plot(test3)
 
 #function for the log likelihood of the model
-univaraite.log.likelihood <- function(){
+univaraite.log.likelihood <- function(BW.samples, BZ.samples, Theta.matrix, Sigma.samples){
+  #The likelihood should be multivariate normal per observation
+  #the mean structures is the fixed and random componets
   
 }
 
