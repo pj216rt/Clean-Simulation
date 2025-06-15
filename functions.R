@@ -483,10 +483,11 @@ goldsmiths.one.d.gibbs <- function(Y, fixed_design.mat, random_design.mat,
   
   #return things
   ret = list(beta.pm, beta.LB, beta.UB, ranef.pm, sig.pm, Yhat, BW.samples, BZ.samples, Sigma_samples,
-             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw, Wi)
+             sigma2_z_samples, sigma2_w_samples, P.mat, v, Psi, Az, Bz, Aw, Bw, Wi, Z.des, Theta)
   names(ret) = c("beta.pm", "beta.LB", "beta.UB", "ranef.pm", "sig.pm", "Yhat", "BW_samples", "BZ_samples",
                  "Sigma_samples", "sigma_Z_samples", "sigma_W_samples", "Penalty_Matrix", "inv.wish.df",
-                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b", "fixed_effect_design")
+                 "inv.wish.scale", "SigmaZ.a", "SigmaZ.b", "SigmaW.a", "SigmaW.b", "fixed_effect_design",
+                 "random_effect_design", "Theta_matrix")
   
   ret
 }
@@ -561,11 +562,33 @@ test3 <- univariate.log.prior(Sigma.samples = test2$Sigma_samples, Sigma.prior.d
 plot(test3)
 
 #function for the log likelihood of the model
-univaraite.log.likelihood <- function(BW.samples, BZ.samples, Theta.matrix, Sigma.samples){
+univariate.log.likelihood <- function(fixed.design.matrix, random.design.matrix, 
+                                      BW.samples, BZ.samples, Theta.matrix, Sigma.samples){
   #The likelihood should be multivariate normal per observation
-  #the mean structures is the fixed and random componets
+  #the mean structures is the fixed and random components
+  
+  #get the number of samples we're looping over
+  S <- dim(Sigma.samples)[3]
+  
+  #initialize
+  lp_vector <- numeric(S)
+  
+  print(dim(BW.samples))
+  print(dim(BZ.samples))
+  print(dim(Sigma.samples))
+  
+  for (s in 1:S) {
+    BW_s <- BW.samples[,,s]  
+    BZ_s <- BZ.samples[,,s]  
+    Sigma_s <- Sigma.samples[,,s] 
+  }
   
 }
+
+test4 <- univariate.log.likelihood(fixed.design.matrix = test2$fixed_effect_design, 
+                                   random.design.matrix = test2$random_effect_design,
+                                   BW.samples = test2$BW_samples, BZ.samples = test2$BZ_samples,
+                                   Theta.matrix = test2$Theta_matrix, Sigma.samples = test2$Sigma_samples)
 
 #Goldsmith's modified Gibbs sampler for 3 dimensions
 goldsmiths.three.d.gibbs <- function(Y, fixed_design.mat, random_design.mat, 
